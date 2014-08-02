@@ -106,3 +106,91 @@ Player.prototype.setupDragging = function() {
 };
 
 var player = [new Player(gameOptions).render(gameBoard)];
+
+// Enemies!!!
+var createEnemies = function() {
+  var allEnemies = Array.apply(null, Array(gameOptions.nEnemies)).map(function (_, i) {
+    return i;
+  });
+  return allEnemies.map(function(i){
+    return {id: i, x: Math.random()*100, y: Math.random()*100};
+  });
+};
+
+var render = function(enemyData){
+  var enemies = gameBoard.selectAll('circle.enemy')
+                .data(enemyData, function(d){
+                  return d.id;
+                });
+  //draw missing enemies
+  enemies.enter()
+        .append('svg:circle')
+        .attr('class','enemy')
+        .attr('cx', function(enemy){return axes.x(enemy.x)})
+        .attr('cy', function(enemy){return axes.y(enemy.y)})
+        .attr('r', 0);
+  //remove extra enemies
+  enemies.exit().remove();
+  //collision detection
+  var checkCollision = function(enemy, collidedCallback){
+    for(var i = 0; i < player.length; i++){
+      var radiusSum = parseFloat(enemy.attr('r')) + player[i].r;
+      var xDiff = parseFloat(enemy.attr('cx')) - player[i].x;
+      var yDiff = parseFloat(enemy.attr('cy')) - player[i].y;
+      var separation = Math.sqrt(Math.pow(xDiff,2) + Math.pow(yDiff,2));
+      if (separation < radiusSum) {
+        collidedCallback(player[i], enemy);
+      }
+    }
+  };
+
+  var onCollision = function() {
+    updateBest();
+    gameStats.score = 0;
+    updateScore();
+  };
+
+  var tweenWithCollisionDetection = function(endData) {
+    enemy = d3.select(this);
+    var startPos = {
+      x: parseFloat(enemy.attr('cx')),
+      y: parseFloat(enemy.attr('cy'))
+    };
+    var endPos = {
+      x: axes.x(endData.x),
+      y: axes.y(endData.y)
+    };
+    return function(t) {
+      checkCollision(enemy, onCollision);
+      var enemyNextPos = {
+        x: startPos.x + (endPos.x - startPos.x)*t,
+        y: startPos.y + (endPos.y - startPos.y)*t
+      }
+      enemy.attr('cx', enemyNextPos.x)
+            .attr('cy', enemyNextPos.y)
+    }
+  };
+
+  enemies.transition()
+        .duration(500)
+        .attr('r', 10)
+        .trainsition()
+        .duration(2000)
+        .tween('custom', tweenWithCollisionDetection);
+};
+
+var play = function() {
+  var gameTurn = function() {
+    var newEnemyPos = createEnemies();
+    render(newEnemyPos);
+  };
+  var increaseScore = function() {
+    gameStats.score++;
+    updateScore();
+  };
+  gameTurn();
+  setInterval(gameTurn, 2000);
+  setInterval(increaseScore, 50);
+};
+
+play();
